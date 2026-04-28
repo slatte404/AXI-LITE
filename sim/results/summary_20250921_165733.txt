@@ -1,0 +1,4 @@
+axi_lite_test   : FAIL
+axi_full_test   : FAIL
+axi_random_test : FAIL
+axi_wraddr_test : FAIL

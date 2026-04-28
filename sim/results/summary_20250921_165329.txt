@@ -1,0 +1,4 @@
+axi_lite_test   : PASS
+axi_full_test   : PASS
+axi_random_test : PASS
+axi_wraddr_test : PASS

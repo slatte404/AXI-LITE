@@ -1,0 +1,27 @@
+# VCS 编译产物
+simv
+simv.daidir/
+csrc/
+vc_hdrs.h
+ucli.key
+64/
+DVEfiles/
+
+# 仿真日志和波形
+*.log
+*.fsdb
+*.vpd
+*.vcd
+novas.*
+verdiLog/
+
+# 覆盖率数据库
+cov.vdb/
+urgReport/
+
+# 临时文件
+*~
+core
+
+# 回归结果 (可选：如果不想追踪仿真结果)
+# sim/results/

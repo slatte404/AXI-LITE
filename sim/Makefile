@@ -32,6 +32,10 @@ build:
 run:
 	@mkdir -p $(OUT)/$(TEST)_$(SEED)
 	@echo "Running $(TEST) with SEED=$(SEED) in $(OUT)/$(TEST)_$(SEED)..."
+	@echo '#!/bin/bash' > $(OUT)/$(TEST)_$(SEED)/run_verdi.sh
+	@echo 'cd ../../' >> $(OUT)/$(TEST)_$(SEED)/run_verdi.sh
+	@echo 'verdi -ntb_opts uvm-1.2 -f filelist.f -ssf $(OUT)/$(TEST)_$(SEED)/tb.fsdb &' >> $(OUT)/$(TEST)_$(SEED)/run_verdi.sh
+	@chmod +x $(OUT)/$(TEST)_$(SEED)/run_verdi.sh
 	cd $(OUT)/$(TEST)_$(SEED) && \
 	../../simv +UVM_TESTNAME=$(TEST) \
 		+ntb_random_seed=$(SEED) \

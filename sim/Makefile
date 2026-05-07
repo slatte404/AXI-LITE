@@ -1,19 +1,20 @@
 
 # ==============================================================================
-# AXI-Lite 自动化仿真 Makefile
+# AXI-Lite 自动化仿真 Makefile (洁癖版)
 # ==============================================================================
 
-# 默认参数（可以在命令行修改，例如: make run TEST=random_test SEED=123）
+# 默认参数
 TEST     ?= axi_base_test
 SEED     ?= 1
 VERB     ?= UVM_MEDIUM
 COV_DIR  ?= cov.vdb
+OUT      ?= results
 
-# 仿真列表（用于一键回归）
+# 仿真列表 (用于回归)
 TEST_LIST = axi_base_test axi_full_test axi_random_test axi_wraddr_test
 
 # ------------------------------------------------------------------------------
-# 1. 编译 (Build) - 只有代码变动时才需要跑一次
+# 1. 编译 (Build)
 # ------------------------------------------------------------------------------
 build:
 	vcs -f filelist.f \
@@ -26,40 +27,42 @@ build:
 		-l compile.log
 
 # ------------------------------------------------------------------------------
-# 2. 运行 (Run) - 编译一次后，可以无限次跑不同的测试
+# 2. 运行 (Run) - 在独立的子文件夹中运行
 # ------------------------------------------------------------------------------
 run:
-	./simv +UVM_TESTNAME=$(TEST) \
+	@mkdir -p $(OUT)/$(TEST)_$(SEED)
+	@echo "Running $(TEST) with SEED=$(SEED) in $(OUT)/$(TEST)_$(SEED)..."
+	cd $(OUT)/$(TEST)_$(SEED) && \
+	../../simv +UVM_TESTNAME=$(TEST) \
 		+ntb_random_seed=$(SEED) \
 		+UVM_VERBOSITY=$(VERB) \
 		+vcs+assert+cov \
-		-cm_dir $(COV_DIR) \
+		-cm_dir ../../$(COV_DIR) \
 		-cm_append \
-		-l $(TEST)_$(SEED).log
+		-l sim.log
 
 # ------------------------------------------------------------------------------
-# 3. 回归测试 (Regression) - 一键跑完所有用例
+# 3. 回归测试 (Regression)
 # ------------------------------------------------------------------------------
 regr: build
 	@echo "Starting Regression..."
 	@for t in $(TEST_LIST); do \
-		echo "Running test: $$t"; \
-		./simv +UVM_TESTNAME=$$t +ntb_random_seed=$(SEED) -cm_dir $(COV_DIR) -cm_append -l $$t.log; \
+		make run TEST=$$t SEED=$(SEED); \
 	done
 	@make cov
 
 # ------------------------------------------------------------------------------
 # 4. 其他工具
 # ------------------------------------------------------------------------------
-# 查看波形
+# 查看最近一次跑的波形 (假设在主目录下生成了 fsdb)
 verdi:
 	verdi -ntb_opts uvm-1.2 -f filelist.f -ssf tb.fsdb &
 
-# 合并覆盖率并查看报告
+# 合并覆盖率
 cov:
 	urg -full64 -dir $(COV_DIR) -report urgReport
 	@echo "Coverage report generated in urgReport directory"
 
 # 清理环境
 clean:
-	rm -rf *~ core csrc simv* vc_hdrs.h ucli.key urg* *.log novas.* *.fsdb* verdiLog 64* DVEfiles *.vpd $(COV_DIR) urgReport
+	rm -rf *~ core csrc simv* vc_hdrs.h ucli.key urg* *.log novas.* *.fsdb* verdiLog 64* DVEfiles *.vpd $(COV_DIR) urgReport $(OUT)

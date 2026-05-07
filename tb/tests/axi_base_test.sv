@@ -1,5 +1,8 @@
-class axi_lite_test extends uvm_test;
-  `uvm_component_utils(axi_lite_test)
+`ifndef AXI_BASE_TEST_SV
+`define AXI_BASE_TEST_SV
+
+class axi_base_test extends uvm_test;
+  `uvm_component_utils(axi_base_test)
 
   // virtual interface
   virtual axi_lite_if vif;
@@ -10,7 +13,7 @@ class axi_lite_test extends uvm_test;
   // sequence 基类泛型
   axi_rw_seq m_seq;
 
-  function new(string name="axi_lite_test", uvm_component parent=null);
+  function new(string name="axi_base_test", uvm_component parent=null);
     super.new(name, parent);
   endfunction
 
@@ -47,4 +50,4 @@ class axi_lite_test extends uvm_test;
   endtask
 endclass
 
-
+`endif

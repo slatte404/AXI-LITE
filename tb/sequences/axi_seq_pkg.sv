@@ -5,6 +5,8 @@ package axi_seq_pkg;
   import axi_env_pkg::*;
   `include "../tb/sequences/axi_lite_seq.sv"
   `include "../tb/sequences/axi_full_seq.sv"
+  `include "../tb/sequences/axi_random_seq.sv"
+  `include "../tb/sequences/axi_wr_addr_seq.sv"
 endpackage : axi_seq_pkg
 `endif
 

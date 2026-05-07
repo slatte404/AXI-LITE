@@ -1,7 +1,7 @@
 `ifndef AXI_RANDOM_TEST_SV
 `define AXI_RANDOM_TEST_SV
 
-class axi_random_test extends axi_lite_test;
+class axi_random_test extends axi_base_test;
   `uvm_component_utils(axi_random_test)
 
   function new(string name="axi_random_test", uvm_component parent=null);

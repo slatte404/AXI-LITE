@@ -38,7 +38,7 @@ run:
 		+UVM_VERBOSITY=$(VERB) \
 		+vcs+assert+cov \
 		-cm_dir ../../$(COV_DIR) \
-		-cm_append \
+		-cm_name $(TEST)_$(SEED) \
 		-l sim.log
 
 # ------------------------------------------------------------------------------

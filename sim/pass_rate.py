@@ -1,62 +1,67 @@
 #!/usr/bin/env python3
-import re
-import sys
+import os
+import glob
 
-# 默认日志文件名
-default_log_file = "vcs.log"
+RESULTS_DIR = "results"
 
-# 获取日志文件，如果命令行传了参数就用参数，否则用默认文件
-if len(sys.argv) < 2:
-    log_file = default_log_file
-    print(f"No log file specified. Using default: {log_file}")
-else:
-    log_file = sys.argv[1]
+def analyze_log(log_path):
+    pass_count = 0
+    fail_count = 0
+    uvm_errors = 0
+    uvm_fatals = 0
+    
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                if "UVM_ERROR " in line:
+                    uvm_errors += 1
+                if "UVM_FATAL " in line:
+                    uvm_fatals += 1
+                    
+                # 兼容现有的 SCOREBOARD 打印格式
+                if "SCOREBOARD" in line and "READ" in line:
+                    if "PASS" in line:
+                        pass_count += 1
+                    elif "MISMATCH" in line or "FAIL" in line:
+                        fail_count += 1
+                        
+    except Exception as e:
+        print(f"Error reading {log_path}: {e}")
+        
+    return pass_count, fail_count, uvm_errors, uvm_fatals
 
-pass_count = 0
-fail_count = 0
-fail_transactions = []  # 用于记录失败的事务
+def main():
+    if not os.path.exists(RESULTS_DIR):
+        print(f"[WARN] No results directory found at '{RESULTS_DIR}'. Please run tests first.")
+        return
 
-# 匹配 SCOREBOARD 的 READ PASS / READ FAIL 行
-pattern = re.compile(
-    r'\[SCOREBOARD\] READ (PASS|FAIL): addr=0x([0-9A-Fa-f]+) reg=(\d+) data=0x([0-9A-Fa-f]+)'
-)
+    # 自动扫描所有的 sim.log
+    log_files = glob.glob(os.path.join(RESULTS_DIR, "*", "sim.log"))
+    
+    if not log_files:
+        print("[WARN] No sim.log files found in results subdirectories.")
+        return
 
-try:
-    with open(log_file, "r") as f:
-        for line in f:
-            match = pattern.search(line)
-            if match:
-                result, addr, reg, data = match.groups()
-                addr_int = int(addr, 16)
-                data_int = int(data, 16)
-                reg_int = int(reg)
+    print("="*75)
+    print(f"{'Test Folder (Test_Seed)':<30} | {'Read Pass':<10} | {'Read Fail':<10} | {'UVM Err/Fat':<15}")
+    print("-" * 75)
+    
+    total_pass = 0
+    total_fail = 0
+    
+    for log in sorted(log_files):
+        test_dir_name = os.path.basename(os.path.dirname(log))
+        p_cnt, f_cnt, u_err, u_fat = analyze_log(log)
+        total_pass += p_cnt
+        total_fail += f_cnt
+        
+        status_str = f"{u_err} / {u_fat}"
+        print(f"{test_dir_name:<30} | {p_cnt:<10} | {f_cnt:<10} | {status_str:<15}")
 
-                if result == "PASS":
-                    pass_count += 1
-                elif result == "FAIL":
-                    fail_count += 1
-                    # 记录失败事务
-                    fail_transactions.append({
-                        "addr": addr_int,
-                        "reg": reg_int,
-                        "data": data_int
-                    })
+    print("="*75)
+    total_reads = total_pass + total_fail
+    pass_rate = (total_pass / total_reads * 100) if total_reads > 0 else 0.0
+    print(f"Global Read Pass Rate: {pass_rate:.2f}% ({total_pass}/{total_reads})")
 
-    total = pass_count + fail_count
-    pass_rate = (pass_count / total * 100) if total > 0 else 0.0
-
-    print(f"Total READ transactions: {total}")
-    print(f"PASS: {pass_count}")
-    print(f"FAIL: {fail_count}")
-    print(f"Pass rate: {pass_rate:.2f}%")
-
-    if fail_transactions:
-        print("\nFailed READ transactions:")
-        for tr in fail_transactions:
-            print(f"  addr=0x{tr['addr']:08X} reg={tr['reg']} data=0x{tr['data']:08X}")
-
-except FileNotFoundError:
-    print(f"Error: log file '{log_file}' not found.")
-    sys.exit(1)
-
-
+if __name__ == "__main__":
+    main()

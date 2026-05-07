@@ -1,4 +1,7 @@
 module tb_top;
+  `include "uvm_macros.svh"
+  import uvm_pkg::*;
+  
   // -------------------
   // Clock & reset
   // -------------------

@@ -97,9 +97,8 @@ axi_lite_slave_assertions #(
   // -------------------
   initial begin
     // dump FSDB
-    //$fsdbDumpfile("tb.fsdb");
-    //$fsdbDumpvars(0, dut);  // 0表示层级深度全部
-    // 如果只想 dump DUT，可以用 $fsdbDumpvars(0, dut);
+    $fsdbDumpfile("tb.fsdb");
+    $fsdbDumpvars(0, tb_top);  // 推荐 dump 整个 tb_top，这样不仅能看到 dut，还能看到接口信号
 
     // 配置 virtual interface
     uvm_config_db#(virtual axi_lite_if)::set(null, "uvm_test_top", "vif", vif);

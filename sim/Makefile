@@ -54,9 +54,9 @@ regr: build
 # ------------------------------------------------------------------------------
 # 4. 其他工具
 # ------------------------------------------------------------------------------
-# 查看最近一次跑的波形 (假设在主目录下生成了 fsdb)
+# 查看波形 (可以指定 TEST 和 SEED，默认打开 axi_base_test_1)
 verdi:
-	verdi -ntb_opts uvm-1.2 -f filelist.f -ssf tb.fsdb &
+	verdi -ntb_opts uvm-1.2 -f filelist.f -ssf $(OUT)/$(TEST)_$(SEED)/tb.fsdb &
 
 # 合并覆盖率
 cov:

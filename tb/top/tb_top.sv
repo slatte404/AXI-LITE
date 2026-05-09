@@ -13,12 +13,8 @@ module tb_top;
 
   initial begin
     aresetn = 0;
-    #10
-    aresetn = 1;
-    #10
-    aresetn = 0;
-    #30;
-    aresetn = 1;
+    #30; // 维持一段时间的上电复位
+    aresetn = 1; // 释放复位，后续控制交给 UVM Sequence
   end
 
   // -------------------

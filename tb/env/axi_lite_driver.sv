@@ -13,7 +13,7 @@ class axi_lite_driver extends uvm_driver #(axi_trans_base);
   axi_read_trans  r_tr;
 
   virtual axi_lite_if vif; 
-  bit in_reset; 
+  event reset_ev; 
 
   // ==== 方法声明 (extern) ====
   extern function new(string name, uvm_component parent);
@@ -25,10 +25,8 @@ class axi_lite_driver extends uvm_driver #(axi_trans_base);
   extern virtual task process_transactions();
   
   // 辅助任务
-  extern virtual task wait_until_reset_deasserted();
-  extern virtual task write_with_reset(input logic [31:0] addr, input logic [63:0] data, input logic [7:0] strobe);
-  extern virtual task read_with_reset(input logic [31:0] addr, output logic [63:0] data);
-  extern virtual task wait_with_reset(ref logic signal);
+  extern virtual task write_normal(input logic [31:0] addr, input logic [63:0] data, input logic [7:0] strobe);
+  extern virtual task read_normal(input logic [31:0] addr, output logic [63:0] data);
   extern virtual task clean_up_signals();
   extern virtual task clean_up_read_signals();
 
@@ -40,7 +38,6 @@ endclass
 
 function axi_lite_driver::new(string name, uvm_component parent);
   super.new(name, parent);
-  in_reset = 0;
 endfunction
 
 function void axi_lite_driver::build_phase(uvm_phase phase);
@@ -51,54 +48,65 @@ endfunction
 
 task axi_lite_driver::run_phase(uvm_phase phase);
   fork
-    monitor_reset();         // 线程1: 监控复位
+    monitor_reset();         // 线程1: 后台持续监控复位
     process_transactions();  // 线程2: 处理事务
   join
 endtask
 
 task axi_lite_driver::monitor_reset();
   forever begin
-    @(posedge vif.aclk); // 每个时钟周期检查
-    in_reset = !vif.aresetn;
-    if (in_reset) begin
-      clean_up_signals();
-      clean_up_read_signals();
-    end
+    @(negedge vif.aresetn); // 捕捉复位下降沿
+    -> reset_ev;            // 触发复位事件
+    clean_up_signals();     // 立刻清理总线
+    clean_up_read_signals();
   end
 endtask
 
 task axi_lite_driver::process_transactions();
   forever begin
     // 等待 reset 解除
-    wait_until_reset_deasserted();
+    wait(vif.aresetn == 1);
 
     // 获取 transaction
     seq_item_port.get_next_item(tr);
     `uvm_info(get_type_name(), $sformatf("GET transaction type = %s",tr.get_type_name()), UVM_MEDIUM)
 
-    // 根据 transaction 类型执行
-    if ($cast(w_tr, tr)) begin
-      write_with_reset(w_tr.addr, w_tr.data, w_tr.strobe);
-      `uvm_info(get_type_name(), $sformatf("WRITE addr=0x%0h data=0x%0h", w_tr.addr, w_tr.data), UVM_MEDIUM)
+    // 【关键修复】如果在空闲等待发包时发生了复位，event 会被错过。
+    // 这里我们刚拿到包，必须确认一下现在是不是处于复位状态。
+    // 如果恰好在复位期间 sequencer 发了包，我们直接扔掉它，不去做驱动。
+    if (vif.aresetn == 0) begin
+      seq_item_port.item_done();
+      continue;
     end
-    else if ($cast(r_tr, tr)) begin
-      read_with_reset(r_tr.addr, r_tr.data);
-      `uvm_info(get_type_name(), $sformatf("READ addr=0x%0h data=0x%0h", r_tr.addr, r_tr.data), UVM_MEDIUM)
-    end
+
+    // 开始读写和复位赛跑
+    fork
+      begin : drive_thread
+        if ($cast(w_tr, tr)) begin
+          write_normal(w_tr.addr, w_tr.data, w_tr.strobe);
+          `uvm_info(get_type_name(), $sformatf("WRITE addr=0x%0h data=0x%0h", w_tr.addr, w_tr.data), UVM_MEDIUM)
+        end
+        else if ($cast(r_tr, tr)) begin
+          read_normal(r_tr.addr, r_tr.data);
+          `uvm_info(get_type_name(), $sformatf("READ addr=0x%0h data=0x%0h", r_tr.addr, r_tr.data), UVM_MEDIUM)
+        end
+      end
+      begin : reset_thread
+        @(reset_ev); // 坐等复位事件发生
+      end
+    join_any
+
+    disable fork; // 无论是哪一边先结束，都杀掉另一边！
+
+    // 每次事务结束后（不论是正常结束还是被打断），统一打扫战场
+    clean_up_signals();
+    clean_up_read_signals();
 
     seq_item_port.item_done();
   end
 endtask
 
-task axi_lite_driver::wait_until_reset_deasserted();
-  while (in_reset) @(posedge vif.aclk);
-  @(posedge vif.aclk); // 保证稳定
-endtask
-
-task axi_lite_driver::write_with_reset(input logic [31:0] addr, input logic [63:0] data, input logic [7:0] strobe);
-  // reset 有效时直接不做操作
-  if (in_reset) disable write_with_reset;
-
+task axi_lite_driver::write_normal(input logic [31:0] addr, input logic [63:0] data, input logic [7:0] strobe);
   vif.awaddr  <= addr;
   vif.awvalid <= 1;
   vif.wdata   <= data;
@@ -106,51 +114,35 @@ task axi_lite_driver::write_with_reset(input logic [31:0] addr, input logic [63:
   vif.wvalid  <= 1;
   vif.bready  <= 1;
 
-  wait_with_reset(vif.awready);
-  if (in_reset) begin clean_up_signals(); return; end // 如果中断，立刻返回退出任务
-
-  wait_with_reset(vif.wready);
-  if (in_reset) begin clean_up_signals(); return; end
+  while(!vif.awready) @(posedge vif.aclk);
+  while(!vif.wready)  @(posedge vif.aclk);
 
   @(posedge vif.aclk);
   vif.awvalid <= 0;
   vif.wvalid <= 0;
 
-  wait_with_reset(vif.bvalid);
-  if (in_reset) begin clean_up_signals(); return; end
+  while(!vif.bvalid)  @(posedge vif.aclk);
 
   @(posedge vif.aclk);
-  clean_up_signals();
+  // 注意：这里不用写 clean_up_signals()，因为外面的 process_transactions 统一做完了
 endtask
 
-task axi_lite_driver::read_with_reset(input logic [31:0] addr, output logic [63:0] data);
-  if (in_reset) begin
-    data = '0;
-    disable read_with_reset;
-  end
-
+task axi_lite_driver::read_normal(input logic [31:0] addr, output logic [63:0] data);
   vif.araddr  <= addr;
   vif.arvalid <= 1;
   vif.rready  <= 1;
 
-  wait_with_reset(vif.arready);
-  if (in_reset) begin clean_up_read_signals(); return; end
+  while(!vif.arready) @(posedge vif.aclk);
 
   @(posedge vif.aclk);
   vif.arvalid <= 0;
 
-  wait_with_reset(vif.rvalid);
-  if (in_reset) begin clean_up_read_signals(); return; end
+  while(!vif.rvalid)  @(posedge vif.aclk);
 
   data = vif.rdata;
 
   @(posedge vif.aclk);
-  clean_up_read_signals();
-endtask
-
-task axi_lite_driver::wait_with_reset(ref logic signal);
-  while (!signal && !in_reset) @(posedge vif.aclk);
-  // 结束时要么 signal=1，要么被 reset 强行打断
+  // 同样：外部会统一调用 clean_up_read_signals()
 endtask
 
 task axi_lite_driver::clean_up_signals();

@@ -11,7 +11,7 @@ COV_DIR  ?= cov.vdb
 OUT      ?= results
 
 # 仿真列表 (用于回归)
-TEST_LIST = axi_base_test axi_full_test axi_random_test axi_wraddr_test wstrb_test error_test
+TEST_LIST = axi_base_test axi_full_test axi_random_test axi_wraddr_test axi_wstrb_test axi_error_test
 
 # ------------------------------------------------------------------------------
 # 1. 编译 (Build)

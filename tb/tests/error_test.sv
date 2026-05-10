@@ -1,10 +1,10 @@
 `ifndef ERROR_TEST_SV
 `define ERROR_TEST_SV
 
-class error_test extends axi_base_test;
-  `uvm_component_utils(error_test)
+class axi_error_test extends axi_base_test;
+  `uvm_component_utils(axi_error_test)
 
-  function new(string name = "error_test", uvm_component parent = null);
+  function new(string name = "axi_error_test", uvm_component parent = null);
     super.new(name, parent);
   endfunction
 

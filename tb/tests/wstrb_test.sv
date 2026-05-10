@@ -1,10 +1,10 @@
 `ifndef WSTRB_TEST_SV
 `define WSTRB_TEST_SV
 
-class wstrb_test extends axi_base_test;
-  `uvm_component_utils(wstrb_test)
+class axi_wstrb_test extends axi_base_test;
+  `uvm_component_utils(axi_wstrb_test)
 
-  function new(string name = "wstrb_test", uvm_component parent = null);
+  function new(string name = "axi_wstrb_test", uvm_component parent = null);
     super.new(name, parent);
   endfunction
 

@@ -8,14 +8,16 @@ class axi_error_test extends axi_base_test;
     super.new(name, parent);
   endfunction
 
-  virtual function void build_phase(uvm_phase phase);
-    super.build_phase(phase);
-    // 设置默认 sequence
-    uvm_config_db#(uvm_object_wrapper)::set(this, 
-                                            "env.agent.sqr.run_phase", 
-                                            "default_sequence", 
-                                            axi_error_seq::type_id::get());
-  endfunction
+  virtual task run_phase(uvm_phase phase);
+    axi_error_seq err_seq;
+    
+    // 重点：不要调用 super.run_phase()，否则会跑基类的 Smoke Test
+    
+    phase.raise_objection(this);
+    err_seq = axi_error_seq::type_id::create("err_seq");
+    err_seq.start(env.agent.sequencer); // 手动启动当前特有的 Sequence
+    phase.drop_objection(this);
+  endtask
 endclass
 
 `endif

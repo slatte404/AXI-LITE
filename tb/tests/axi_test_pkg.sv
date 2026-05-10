@@ -9,6 +9,8 @@ package axi_test_pkg;
   `include "../tb/tests/full_test.sv"
   `include "../tb/tests/random_test.sv"
   `include "../tb/tests/wraddr_test.sv"
+  `include "../tb/tests/wstrb_test.sv"
+  `include "../tb/tests/error_test.sv"
 endpackage : axi_test_pkg
 `endif
 

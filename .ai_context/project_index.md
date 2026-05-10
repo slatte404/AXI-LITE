@@ -1,6 +1,6 @@
 # AXI-Lite Slave 项目全局索引
 
-> **最后更新**: 2026-04-28
+> **最后更新**: 2026-05-10
 > **项目路径**: `d:\dv\axi_lite`
 > **协议**: AMBA AXI4-Lite (Slave 端)
 > **语言**: SystemVerilog / UVM / Python
@@ -226,4 +226,45 @@ python3 pass_rate.py sim.log        # 解析日志计算 scoreboard 读通过率
 3. **Scoreboard 按 64-bit 对齐**: 地址右移3位作为寄存器索引 (`addr >> 3`)。
 4. **Coverage 采样在 subscriber 的 write 函数中**: 由 monitor 的 analysis_port 触发。
 5. **axi_test_pkg.sv 中存在包名冲突**: 包名 `axi_seq_pkg` 与 `axi_seq_pkg.sv` 中的同名，当前通过 filelist.f 直接 include 绕过（包被注释掉了）。
-6. **tb_top 中有 reset 抖动测试**: 先 reset→release→再 reset→release，测试 reset 恢复能力。
+6. **tb_top 逻辑简化**: 已从硬编码复位改为上电复位，异常复位测试由 Sequence 掌控。
+
+---
+
+## 九、验证计划 (Test Plan)
+
+为确保 AXI-Lite Slave 的健壮性，测试用例规划分为以下五个层级：
+
+### 9.1 冒烟与基础测试 (Sanity & Smoke Tests)
+- **`test_sanity`**: 基础读写测试，对基地址进行一次 Write 后立即 Read 回来对比。
+- **`test_walk_1s_0s`**: 走 1/0 测试，检查数据总线和地址总线是否存在 Stuck-at 故障。
+
+### 9.2 功能与数据完整性测试 (Functional & Data Integrity)
+- **`test_full_random`**: 全地址空间随机读写测试。
+- **`test_wstrb_partial_write`**: **写掩码测试 (核心)**。验证 `WSTRB` 按字节写入的正确性（修改部分字节，保持其余字节不变）。
+- **`test_unaligned_access`**: 非对齐地址访问测试，验证 Slave 的对齐处理或报错机制。
+
+### 9.3 协议时序与握手测试 (Protocol Timing & Handshake)
+- **`test_back_to_back`**: 连续无间隙的背靠背传输，压力测试 Slave 状态机的响应速度。
+- **`test_random_delay`**: 
+  - Master 延迟提供 WDATA (AWVALID 后延迟 WVALID)。
+  - Master 延迟接收响应 (延迟 BREADY 或 RREADY)。
+
+### 9.4 并发访问测试 (Concurrency Tests)
+- **`test_simultaneous_rw`**: 同时发起 AW 和 AR 请求。验证 Slave 内部对读写通道的并行处理或仲裁逻辑，防止死锁。
+
+### 9.5 异常与复位攻击测试 (Error & Exception Tests)
+- **`test_out_of_bounds`**: 访问未映射地址空间，验证 Slave 返回 `DECERR`。
+- **`test_slave_error`**: 写只读寄存器等非法操作，验证返回 `SLVERR`。
+- **`test_reset_on_the_fly`**: **复位攻击测试 (终极)**。在传输进行中突然拉低 `aresetn`，验证 Driver 能否优雅中断、总线是否清理干净、复位后能否恢复正常。
+
+---
+
+## 十、重大更新记录 (Key Updates)
+
+1. **Driver 重构 (2026-05-09)**:
+   - 引入 `event reset_ev` + `fork...join_any` 处理异步复位，取代旧的 `in_reset` 轮询。
+   - 修复了空闲时复位事件丢失的潜在 Bug。
+   - 实现了事务级自动信号清理 (`clean_up_signals`)。
+2. **TB 架构优化**:
+   - `tb_top` 简化为仅保留 Power-on Reset。
+   - 复位测试权收归 Sequence 层。

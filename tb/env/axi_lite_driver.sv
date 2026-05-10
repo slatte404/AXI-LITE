@@ -84,11 +84,11 @@ task axi_lite_driver::process_transactions();
       begin : drive_thread
         if ($cast(w_tr, tr)) begin
           write_normal(w_tr.addr, w_tr.data, w_tr.strobe);
-          `uvm_info(get_type_name(), $sformatf("WRITE addr=0x%0h data=0x%0h", w_tr.addr, w_tr.data), UVM_MEDIUM)
+          `uvm_info(get_type_name(), $sformatf("DRV WRITE addr=0x%0h data=0x%0h", w_tr.addr, w_tr.data), UVM_MEDIUM)
         end
         else if ($cast(r_tr, tr)) begin
           read_normal(r_tr.addr, r_tr.data);
-          `uvm_info(get_type_name(), $sformatf("READ addr=0x%0h data=0x%0h", r_tr.addr, r_tr.data), UVM_MEDIUM)
+          `uvm_info(get_type_name(), $sformatf("DRV READ addr=0x%0h data=0x%0h", r_tr.addr, r_tr.data), UVM_MEDIUM)
         end
       end
       begin : reset_thread

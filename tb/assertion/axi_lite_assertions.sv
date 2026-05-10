@@ -35,6 +35,11 @@ module axi_lite_slave_assertions #(
 // WRITE CHANNEL ASSERTIONS
 /////////////////////////////////////////////////
 
+/* 
+ * [DISABLED] 以下断言严重违背了 AMBA AXI 协议规范，已被废弃：
+ * 1. AXI 明确允许接收方在 VALID 拉高之前提前拉高 READY（高性能 0-wait-state 设计）。
+ * 2. AXI 明确允许接收方在握手后保持 READY 为高电平（支持背靠背传输）。
+ *
 // AWREADY only asserted when AWVALID
 property awready_only_with_awvalid;
     @(posedge aclk) s_axi_awready |-> s_axi_awvalid;
@@ -62,6 +67,7 @@ property wready_down_after_handshake;
 endproperty
 assert property (wready_down_after_handshake)
     else $error("WREADY did not go low after handshake");
+*/
 
 // BVALID waits for BREADY
 property bvalid_wait_bready;
@@ -95,6 +101,9 @@ assert property (write_resp_valid)
 // READ CHANNEL ASSERTIONS
 /////////////////////////////////////////////////
 
+/* 
+ * [DISABLED] 以下断言严重违背了 AMBA AXI 协议规范，已被废弃。
+ * 
 // ARREADY only asserted when ARVALID
 property arready_only_with_arvalid;
     @(posedge aclk) s_axi_arready |-> s_axi_arvalid;
@@ -108,6 +117,7 @@ property arready_down_after_handshake;
 endproperty
 assert property (arready_down_after_handshake)
     else $error("ARREADY did not go low after handshake");
+*/
 
 // RVALID waits for RREADY
 property rvalid_wait_rready;

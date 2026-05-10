@@ -25,7 +25,7 @@ class axi_lite_driver extends uvm_driver #(axi_trans_base);
   extern virtual task process_transactions();
   
   // 辅助任务
-  extern virtual task write_normal(input logic [31:0] addr, input logic [63:0] data, input logic [7:0] strobe);
+  extern virtual task write_normal(axi_write_trans w_tr);
   extern virtual task read_normal(input logic [31:0] addr, output logic [63:0] data);
   extern virtual task clean_up_signals();
   extern virtual task clean_up_read_signals();
@@ -83,7 +83,7 @@ task axi_lite_driver::process_transactions();
     fork
       begin : drive_thread
         if ($cast(w_tr, tr)) begin
-          write_normal(w_tr.addr, w_tr.data, w_tr.strobe);
+          write_normal(w_tr);
           `uvm_info(get_type_name(), $sformatf("DRV WRITE addr=0x%0h data=0x%0h", w_tr.addr, w_tr.data), UVM_MEDIUM)
         end
         else if ($cast(r_tr, tr)) begin
@@ -106,24 +106,37 @@ task axi_lite_driver::process_transactions();
   end
 endtask
 
-task axi_lite_driver::write_normal(input logic [31:0] addr, input logic [63:0] data, input logic [7:0] strobe);
-  vif.awaddr  <= addr;
-  vif.awvalid <= 1;
-  vif.wdata   <= data;
-  vif.wstrb   <= strobe;
-  vif.wvalid  <= 1;
-  vif.bready  <= 1;
+task axi_lite_driver::write_normal(axi_write_trans w_tr);
+  vif.bready  <= 1; // 提前准备接收响应
 
-  while(!vif.awready) @(posedge vif.aclk);
-  while(!vif.wready)  @(posedge vif.aclk);
+  fork
+    // --- 线程 A: AW 通道 ---
+    begin
+      repeat(w_tr.aw_delay) @(posedge vif.aclk);
+      vif.awaddr  <= w_tr.addr;
+      vif.awvalid <= 1;
+      while(!vif.awready) @(posedge vif.aclk);
+      @(posedge vif.aclk);
+      vif.awvalid <= 0;
+    end
+    
+    // --- 线程 B: W 通道 ---
+    begin
+      repeat(w_tr.w_delay) @(posedge vif.aclk);
+      vif.wdata   <= w_tr.data;
+      vif.wstrb   <= w_tr.strobe;
+      vif.wvalid  <= 1;
+      while(!vif.wready)  @(posedge vif.aclk);
+      @(posedge vif.aclk);
+      vif.wvalid <= 0;
+    end
+  join
 
-  @(posedge vif.aclk);
-  vif.awvalid <= 0;
-  vif.wvalid <= 0;
-
+  // 等待 B 通道响应
   while(!vif.bvalid)  @(posedge vif.aclk);
-
   @(posedge vif.aclk);
+  vif.bready <= 0;
+  
   // 注意：这里不用写 clean_up_signals()，因为外面的 process_transactions 统一做完了
 endtask
 

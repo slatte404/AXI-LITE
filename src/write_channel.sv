@@ -35,33 +35,43 @@ module write_channel #(
 
     write_state_t state;
 
-//logic aw_handshake_done;
-//logic w_handshake_done;
+    logic aw_done;
+    logic w_done;
 
 always_ff @(posedge aclk or negedge aresetn) begin
     if (!aresetn) begin
-        //aw_handshake_done <= 0;
-        //w_handshake_done  <= 0;
-        s_axi_awready <= 1'b0;  // IDLE READY 拉高
+        aw_done <= 1'b0;
+        w_done  <= 1'b0;
+        s_axi_awready <= 1'b0;
         s_axi_wready  <= 1'b0;
+        s_axi_bvalid  <= 1'b0;
+        write_enable  <= 1'b0;
         state <= IDLE;
     end else begin
         case(state)
             IDLE: begin
-                // READY 低，等待 VALID
-                s_axi_awready <= 1'b0;
-                s_axi_wready  <= 1'b0;
+                // 如果该通道还没握手成功，就拉高 READY 准备接收
+                s_axi_awready <= !aw_done;
+                s_axi_wready  <= !w_done;
 
-                if (s_axi_awvalid && !s_axi_awready) s_axi_awready <= 1;
-                if (s_axi_wvalid && !s_axi_wready)   s_axi_wready  <= 1;
+                // 独立捕获 AW 握手
+                if (s_axi_awvalid && s_axi_awready) begin
+                    aw_done <= 1'b1;
+                    s_axi_awready <= 1'b0;
+                end
+                
+                // 独立捕获 W 握手
+                if (s_axi_wvalid && s_axi_wready) begin
+                    w_done <= 1'b1;
+                    s_axi_wready <= 1'b0;
+                end
 
-                // 捕获握手
-                //if (s_axi_awvalid && s_axi_awready) aw_handshake_done <= 1;
-                //if (s_axi_wvalid && s_axi_wready)   w_handshake_done  <= 1;
-
-                // 同时收到地址和数据
-                if (s_axi_awready && s_axi_wready) begin
+                // 只有当两个通道都“曾经”或者“正在”握手成功，才跳转
+                if ((aw_done || (s_axi_awvalid && s_axi_awready)) && 
+                    (w_done  || (s_axi_wvalid && s_axi_wready))) begin
                     state <= WRITE_DATA;
+                    aw_done <= 1'b0;
+                    w_done  <= 1'b0;
                     s_axi_awready <= 1'b0;
                     s_axi_wready  <= 1'b0;
                 end
@@ -71,11 +81,6 @@ always_ff @(posedge aclk or negedge aresetn) begin
                 write_enable <= 1'b1;
                 write_data   <= s_axi_wdata;
                 write_strb   <= s_axi_wstrb;
-
-                // 清标志，为下一笔写准备
-                //aw_handshake_done <= 0;
-                //w_handshake_done  <= 0;
-
                 state <= SEND_RESPONSE;
             end
 
